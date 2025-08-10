@@ -2,30 +2,6 @@ import streamlit as st
 import json
 import os
 
-import streamlit as st
-from streamlit.components.v1 import html
-
-# Вставляем как можно раньше, до основного UI
-html("""
-<script>
-(function () {
-  function supportsNamedGroups() {
-    try { new RegExp("(?<g>a)").test("a"); return true; } catch(e) { return false; }
-  }
-  function supportsLookbehind() {
-    try { new RegExp("(?<=a)b"); return true; } catch(e) { return false; }
-  }
-  if (supportsNamedGroups() && supportsLookbehind()) return;
-
-  function load(src){
-    var s=document.createElement('script'); s.src=src; s.defer=true;
-    document.head.appendChild(s);
-  }
-  load("https://unpkg.com/regexp-named-groups-polyfill");
-  load("https://unpkg.com/regexp-lookbehind-polyfill/dist/index.umd.js");
-})();
-</script>
-""", height=0)
 
 
 st.set_page_config(page_title="📈 Рейтинг участников", layout="centered")
