@@ -3,7 +3,8 @@ import requests
 import json
 import os
 
-st.sidebar.info("Ключ подхвачен? " + ("Да" if (st.secrets.get("GOOGLE_BOOKS_API_KEY") or os.getenv("GOOGLE_BOOKS_API_KEY")) else "Нет"))
+key_exists = bool(st.secrets.get("GOOGLE_BOOKS_API_KEY"))
+st.sidebar.info(f"Ключ в облаке найден? {'Да' if key_exists else 'Нет'}")
 
 
 DATA_FILE = "users_data.json"
