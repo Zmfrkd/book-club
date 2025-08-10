@@ -41,7 +41,9 @@ def get_book_info(title: str):
         st.sidebar.write("Ключ, который отправляем:", safe_key)
         st.sidebar.write("URL:", r.request.url if 'r' in locals() else '—')
 
-        r = requests.get("https://www.googleapis.com/books/v1/volumes", params=params, timeout=12)
+        PROXY_URL = "https://googlebooks-proxy.onrender.com/books"
+        r = requests.get(PROXY_URL, params=params, timeout=12)
+
         r.raise_for_status()
 
         # Отладка — показываем параметры и полный ответ
