@@ -24,7 +24,6 @@ import streamlit as st
 import requests
 
 @st.cache_data(ttl=86400)  # кэшируем сутки
-@st.cache_data(ttl=86400)  # кэшируем сутки
 def get_book_info(title: str):
     api_key = st.secrets.get("GOOGLE_BOOKS_API_KEY") or os.getenv("GOOGLE_BOOKS_API_KEY")
 
@@ -82,11 +81,12 @@ def get_book_info(title: str):
         if docs:
             st.sidebar.write("Open Library нашёл:", len(docs), "результатов")
         for d in docs:
-            n = d.get("number_of_pages_median")
+            # Проверяем оба варианта
+            n = d.get("number_of_pages_median") or d.get("number_of_pages")
             if isinstance(n, int) and n > 0:
                 return {
-                    "title": title,
-                    "author": "",
+                    "title": d.get("title", title),
+                    "author": ", ".join(d.get("author_name", [])) if d.get("author_name") else "",
                     "description": "",
                     "pageCount": n,
                     "thumbnail": ""
@@ -96,9 +96,6 @@ def get_book_info(title: str):
 
     # Если ничего не нашли вообще
     return None
-
-
-
 
 # --- Вспомогательные функции для синхронизации виджетов прогресса ---
 def _keys_for_idx(idx):
