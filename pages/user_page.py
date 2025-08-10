@@ -3,8 +3,7 @@ import requests
 import json
 import os
 
-key_exists = bool(st.secrets.get("GOOGLE_BOOKS_API_KEY"))
-st.sidebar.info(f"Ключ в облаке найден? {'Да' if key_exists else 'Нет'}")
+
 
 
 DATA_FILE = "users_data.json"
@@ -25,22 +24,31 @@ import streamlit as st
 import requests
 
 @st.cache_data(ttl=86400)  # кэшируем сутки
+@st.cache_data(ttl=86400)  # кэшируем сутки
 def get_book_info(title: str):
     api_key = st.secrets.get("GOOGLE_BOOKS_API_KEY") or os.getenv("GOOGLE_BOOKS_API_KEY")
 
     def try_google(q: str):
         params = {
             "q": q,
-            "maxResults": 10,          # берем больше вариантов
+            "maxResults": 30,          # ищем больше книг
             "printType": "books",
             "orderBy": "relevance",
-            # "langRestrict": "ru",    # можно включить при русских названиях
+            "langRestrict": "ru",      # для русских книг
         }
         if api_key:
             params["key"] = api_key
+
         r = requests.get("https://www.googleapis.com/books/v1/volumes", params=params, timeout=12)
         r.raise_for_status()
         items = r.json().get("items", []) or []
+
+        # Логируем в Cloud для отладки
+        st.sidebar.write("Google Books нашёл:", len(items), "результатов")
+        if items:
+            st.sidebar.json(items[0])  # показываем первую книгу полностью
+
+        # Ищем книгу с количеством страниц
         for it in items:
             v = it.get("volumeInfo", {}) or {}
             pc = v.get("pageCount")
@@ -52,32 +60,43 @@ def get_book_info(title: str):
                     "pageCount": pc,
                     "thumbnail": (v.get("imageLinks") or {}).get("thumbnail", "") or ""
                 }
-        return None
 
-    # 1) Google Books: ищем умнее (intitle помогает точности)
+        return None  # если ничего не нашли с pageCount
+
+    # 1) Google Books
     try:
         for q in (f'intitle:"{title}"', title):
             res = try_google(q)
             if res:
                 return res
-    except requests.HTTPError as e:
-        # если 403 — почти всегда ограничения ключа (см. шаг 1)
+    except requests.HTTPError:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        st.sidebar.error(f"Ошибка Google Books: {e}")
 
     # 2) Open Library fallback
     try:
         r = requests.get("https://openlibrary.org/search.json", params={"title": title}, timeout=10)
         r.raise_for_status()
-        for d in r.json().get("docs", []) or []:
+        docs = r.json().get("docs", []) or []
+        if docs:
+            st.sidebar.write("Open Library нашёл:", len(docs), "результатов")
+        for d in docs:
             n = d.get("number_of_pages_median")
             if isinstance(n, int) and n > 0:
-                return {"title": title, "author": "", "description": "", "pageCount": n, "thumbnail": ""}
-    except Exception:
-        pass
+                return {
+                    "title": title,
+                    "author": "",
+                    "description": "",
+                    "pageCount": n,
+                    "thumbnail": ""
+                }
+    except Exception as e:
+        st.sidebar.error(f"Ошибка Open Library: {e}")
 
+    # Если ничего не нашли вообще
     return None
+
 
 
 
