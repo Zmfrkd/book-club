@@ -35,22 +35,9 @@ def get_book_info(title: str):
             "orderBy": "relevance",
             "langRestrict": "ru",
         }
-        if api_key:
-            params["key"] = api_key
-        safe_key = api_key[:5] + "..." + api_key[-3:] if api_key else None
-        st.sidebar.write("Ключ, который отправляем:", safe_key)
-        st.sidebar.write("URL:", r.request.url if 'r' in locals() else '—')
-
         PROXY_URL = "https://googlebooks-proxy.onrender.com/books"
         r = requests.get(PROXY_URL, params=params, timeout=12)
-
         r.raise_for_status()
-
-        # Отладка — показываем параметры и полный ответ
-        st.sidebar.subheader("📚 Google Books API")
-        st.sidebar.write("Параметры запроса:", params)
-        st.sidebar.write("HTTP статус:", r.status_code)
-        st.sidebar.json(r.json())
 
         items = r.json().get("items", []) or []
         for it in items:
@@ -58,13 +45,14 @@ def get_book_info(title: str):
             pc = v.get("pageCount")
             if isinstance(pc, int) and pc > 0:
                 return {
-                    "title": v.get("title", title),
+                    "title": v.get("title", q),
                     "author": ", ".join(v.get("authors", [])) if v.get("authors") else "",
                     "description": v.get("description", "") or "",
                     "pageCount": pc,
                     "thumbnail": (v.get("imageLinks") or {}).get("thumbnail", "") or ""
                 }
         return None
+
 
     # 1) Google Books
     try:
