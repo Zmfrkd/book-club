@@ -37,6 +37,9 @@ def get_book_info(title: str):
         }
         if api_key:
             params["key"] = api_key
+        safe_key = api_key[:5] + "..." + api_key[-3:] if api_key else None
+        st.sidebar.write("Ключ, который отправляем:", safe_key)
+        st.sidebar.write("URL:", r.request.url if 'r' in locals() else '—')
 
         r = requests.get("https://www.googleapis.com/books/v1/volumes", params=params, timeout=12)
         r.raise_for_status()
