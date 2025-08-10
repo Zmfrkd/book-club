@@ -3,6 +3,9 @@ import requests
 import json
 import os
 
+st.sidebar.info("Ключ подхвачен? " + ("Да" if (st.secrets.get("GOOGLE_BOOKS_API_KEY") or os.getenv("GOOGLE_BOOKS_API_KEY")) else "Нет"))
+
+
 DATA_FILE = "users_data.json"
 
 # --- Функции для работы с данными ---
@@ -20,47 +23,61 @@ import os
 import streamlit as st
 import requests
 
-@st.cache_data(ttl=86400)  # кэшируем результаты на 1 день
+@st.cache_data(ttl=86400)  # кэшируем сутки
 def get_book_info(title: str):
-    try:
-        params = {"q": title, "maxResults": 1}
-        api_key = st.secrets.get("GOOGLE_BOOKS_API_KEY") or os.getenv("GOOGLE_BOOKS_API_KEY")
+    api_key = st.secrets.get("GOOGLE_BOOKS_API_KEY") or os.getenv("GOOGLE_BOOKS_API_KEY")
+
+    def try_google(q: str):
+        params = {
+            "q": q,
+            "maxResults": 10,          # берем больше вариантов
+            "printType": "books",
+            "orderBy": "relevance",
+            # "langRestrict": "ru",    # можно включить при русских названиях
+        }
         if api_key:
             params["key"] = api_key
-
-        r = requests.get("https://www.googleapis.com/books/v1/volumes", params=params, timeout=80)
+        r = requests.get("https://www.googleapis.com/books/v1/volumes", params=params, timeout=12)
         r.raise_for_status()
-        data = r.json()
-        if "items" in data:
-            info = data["items"][0]["volumeInfo"]
-            return {
-                "title": info.get("title", title),
-                "author": ", ".join(info.get("authors", [])),
-                "description": info.get("description", ""),
-                "pageCount": info.get("pageCount", 0),
-                "thumbnail": info.get("imageLinks", {}).get("thumbnail", "")
-            }
-    except Exception as e:
-        print("Google Books API error:", e)
+        items = r.json().get("items", []) or []
+        for it in items:
+            v = it.get("volumeInfo", {}) or {}
+            pc = v.get("pageCount")
+            if isinstance(pc, int) and pc > 0:
+                return {
+                    "title": v.get("title", title),
+                    "author": ", ".join(v.get("authors", [])) if v.get("authors") else "",
+                    "description": v.get("description", "") or "",
+                    "pageCount": pc,
+                    "thumbnail": (v.get("imageLinks") or {}).get("thumbnail", "") or ""
+                }
+        return None
 
-    # Фолбэк на Open Library
+    # 1) Google Books: ищем умнее (intitle помогает точности)
+    try:
+        for q in (f'intitle:"{title}"', title):
+            res = try_google(q)
+            if res:
+                return res
+    except requests.HTTPError as e:
+        # если 403 — почти всегда ограничения ключа (см. шаг 1)
+        pass
+    except Exception:
+        pass
+
+    # 2) Open Library fallback
     try:
         r = requests.get("https://openlibrary.org/search.json", params={"title": title}, timeout=10)
         r.raise_for_status()
-        docs = r.json().get("docs", [])
-        for d in docs:
-            if isinstance(d.get("number_of_pages_median"), int):
-                return {
-                    "title": title,
-                    "author": "",
-                    "description": "",
-                    "pageCount": d["number_of_pages_median"],
-                    "thumbnail": ""
-                }
-    except Exception as e:
-        print("Open Library API error:", e)
+        for d in r.json().get("docs", []) or []:
+            n = d.get("number_of_pages_median")
+            if isinstance(n, int) and n > 0:
+                return {"title": title, "author": "", "description": "", "pageCount": n, "thumbnail": ""}
+    except Exception:
+        pass
 
     return None
+
 
 
 # --- Вспомогательные функции для синхронизации виджетов прогресса ---
