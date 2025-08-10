@@ -30,24 +30,24 @@ def get_book_info(title: str):
     def try_google(q: str):
         params = {
             "q": q,
-            "maxResults": 30,          # ищем больше книг
+            "maxResults": 30,
             "printType": "books",
             "orderBy": "relevance",
-            "langRestrict": "ru",      # для русских книг
+            "langRestrict": "ru",
         }
         if api_key:
             params["key"] = api_key
 
         r = requests.get("https://www.googleapis.com/books/v1/volumes", params=params, timeout=12)
         r.raise_for_status()
+
+        # Отладка — показываем параметры и полный ответ
+        st.sidebar.subheader("📚 Google Books API")
+        st.sidebar.write("Параметры запроса:", params)
+        st.sidebar.write("HTTP статус:", r.status_code)
+        st.sidebar.json(r.json())
+
         items = r.json().get("items", []) or []
-
-        # Логируем в Cloud для отладки
-        st.sidebar.write("Google Books нашёл:", len(items), "результатов")
-        if items:
-            st.sidebar.json(items[0])  # показываем первую книгу полностью
-
-        # Ищем книгу с количеством страниц
         for it in items:
             v = it.get("volumeInfo", {}) or {}
             pc = v.get("pageCount")
@@ -59,8 +59,7 @@ def get_book_info(title: str):
                     "pageCount": pc,
                     "thumbnail": (v.get("imageLinks") or {}).get("thumbnail", "") or ""
                 }
-
-        return None  # если ничего не нашли с pageCount
+        return None
 
     # 1) Google Books
     try:
@@ -68,8 +67,8 @@ def get_book_info(title: str):
             res = try_google(q)
             if res:
                 return res
-    except requests.HTTPError:
-        pass
+    except requests.HTTPError as e:
+        st.sidebar.error(f"Ошибка Google Books HTTP: {e}")
     except Exception as e:
         st.sidebar.error(f"Ошибка Google Books: {e}")
 
@@ -78,10 +77,14 @@ def get_book_info(title: str):
         r = requests.get("https://openlibrary.org/search.json", params={"title": title}, timeout=10)
         r.raise_for_status()
         docs = r.json().get("docs", []) or []
-        if docs:
-            st.sidebar.write("Open Library нашёл:", len(docs), "результатов")
+
+        # Отладка — показываем весь ответ
+        st.sidebar.subheader("📚 Open Library API")
+        st.sidebar.write("Параметры запроса:", {"title": title})
+        st.sidebar.write("HTTP статус:", r.status_code)
+        st.sidebar.json(docs)
+
         for d in docs:
-            # Проверяем оба варианта
             n = d.get("number_of_pages_median") or d.get("number_of_pages")
             if isinstance(n, int) and n > 0:
                 return {
@@ -94,8 +97,8 @@ def get_book_info(title: str):
     except Exception as e:
         st.sidebar.error(f"Ошибка Open Library: {e}")
 
-    # Если ничего не нашли вообще
     return None
+
 
 # --- Вспомогательные функции для синхронизации виджетов прогресса ---
 def _keys_for_idx(idx):
