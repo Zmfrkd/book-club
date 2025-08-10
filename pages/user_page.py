@@ -28,7 +28,7 @@ def get_book_info(title: str):
         if api_key:
             params["key"] = api_key
 
-        r = requests.get("https://www.googleapis.com/books/v1/volumes", params=params, timeout=10)
+        r = requests.get("https://www.googleapis.com/books/v1/volumes", params=params, timeout=80)
         r.raise_for_status()
         data = r.json()
         if "items" in data:
