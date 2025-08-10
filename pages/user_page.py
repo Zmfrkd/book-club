@@ -16,14 +16,21 @@ def save_user_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def get_book_info(title):
+import os
+import streamlit as st
+import requests
+
+@st.cache_data(ttl=86400)  # кэшируем результаты на 1 день
+def get_book_info(title: str):
     try:
-        response = requests.get(
-            "https://www.googleapis.com/books/v1/volumes",
-            params={"q": title, "maxResults": 1},
-            timeout=10
-        )
-        data = response.json()
+        params = {"q": title, "maxResults": 1}
+        api_key = st.secrets.get("GOOGLE_BOOKS_API_KEY") or os.getenv("GOOGLE_BOOKS_API_KEY")
+        if api_key:
+            params["key"] = api_key
+
+        r = requests.get("https://www.googleapis.com/books/v1/volumes", params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
         if "items" in data:
             info = data["items"][0]["volumeInfo"]
             return {
@@ -34,8 +41,27 @@ def get_book_info(title):
                 "thumbnail": info.get("imageLinks", {}).get("thumbnail", "")
             }
     except Exception as e:
-        print("Ошибка при обращении к Google Books API:", e)
+        print("Google Books API error:", e)
+
+    # Фолбэк на Open Library
+    try:
+        r = requests.get("https://openlibrary.org/search.json", params={"title": title}, timeout=10)
+        r.raise_for_status()
+        docs = r.json().get("docs", [])
+        for d in docs:
+            if isinstance(d.get("number_of_pages_median"), int):
+                return {
+                    "title": title,
+                    "author": "",
+                    "description": "",
+                    "pageCount": d["number_of_pages_median"],
+                    "thumbnail": ""
+                }
+    except Exception as e:
+        print("Open Library API error:", e)
+
     return None
+
 
 # --- Вспомогательные функции для синхронизации виджетов прогресса ---
 def _keys_for_idx(idx):
